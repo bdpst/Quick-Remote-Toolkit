@@ -121,7 +121,6 @@ try {
         'name',
         'dnshostname',
         'description',
-        'operatingsystem',
         'lastlogontimestamp'
     )) {
         [void]$searcher.PropertiesToLoad.Add($property)
@@ -146,13 +145,12 @@ try {
 
         $dnsName = Get-DirectoryValue -Result $result -Name 'dnshostname'
         $description = Get-DirectoryValue -Result $result -Name 'description'
-        $os = Get-DirectoryValue -Result $result -Name 'operatingsystem'
         $ip = Resolve-ClientIPv4 -DnsName $dnsName -ComputerName $name
 
         [pscustomobject]@{
             Computer = $name
             IP = $ip
-            Person = if ([string]::IsNullOrWhiteSpace($description)) { $os } else { $description }
+            Person = $description
         }
     }
 
