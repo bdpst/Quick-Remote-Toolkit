@@ -4,8 +4,11 @@ chcp 65001 >nul
 
 set "TOOLKIT_CLIENTS_FILE=%~dp0QuickRemoteToolkit.clients.csv"
 set "REMOTE_ASSISTANT_CLIENTS_FILE=%~dp0RemoteAssistant.clients.csv"
+set "FAVORITES_FILE=%~dp0QuickRemoteToolkit.favorites.txt"
+set "LOG_FILE=%~dp0QuickRemoteToolkit.actions.log"
 set "CLIENTS_FILE="
 set "LAST_CHOICE="
+set "SHOW_FAVORITES=0"
 
 set "COLOR_GREEN=[32m"
 set "COLOR_RED=[31m"
@@ -35,9 +38,20 @@ call :print_header
 set "shown=0"
 for /f "usebackq skip=1 tokens=1-4 delims=;" %%A in ("%CLIENTS_FILE%") do (
     if not "%%~A"=="" (
-        call :print_row "%%A" "%%B" "%%C" "%%D"
-        set /a shown+=1
+        set "can_show=1"
+        if "%SHOW_FAVORITES%"=="1" (
+            call :is_favorite "%%B"
+            if "!IS_FAVORITE!"=="0" set "can_show=0"
+        )
+        if "!can_show!"=="1" (
+            call :print_row "%%A" "%%B" "%%C" "%%D"
+            set /a shown+=1
+        )
     )
+)
+
+if "%shown%"=="0" (
+    echo:  %COLOR_RED%В выбранном режиме список пуст.%COLOR_RESET%
 )
 
 call :print_client_footer
@@ -51,6 +65,15 @@ if /i "%choice%"=="Q" exit /b 0
 
 if /i "%choice%"=="E" (
     start "" notepad.exe "%CLIENTS_FILE%"
+    goto client_list
+)
+
+if /i "%choice%"=="F" (
+    if "%SHOW_FAVORITES%"=="1" (
+        set "SHOW_FAVORITES=0"
+    ) else (
+        set "SHOW_FAVORITES=1"
+    )
     goto client_list
 )
 
@@ -87,6 +110,13 @@ echo:  %COLOR_YELLOW%2   ^| Проверить ping клиента%COLOR_RESET%
 echo:  %COLOR_YELLOW%3   ^| Открыть \\!computer!\c$%COLOR_RESET%
 echo:  %COLOR_YELLOW%4   ^| Открыть Event Viewer удаленного ПК%COLOR_RESET%
 echo:  %COLOR_YELLOW%5   ^| Запустить mstsc%COLOR_RESET%
+echo:  %COLOR_YELLOW%6   ^| Tracert до клиента%COLOR_RESET%
+echo:  %COLOR_YELLOW%7   ^| Открыть Computer Management%COLOR_RESET%
+echo:  %COLOR_YELLOW%8   ^| Открыть удаленный cmd через WinRS%COLOR_RESET%
+echo:  %COLOR_YELLOW%G   ^| Запустить gpupdate /force через WinRS%COLOR_RESET%
+echo:  %COLOR_YELLOW%C   ^| Скопировать имя ПК%COLOR_RESET%
+echo:  %COLOR_YELLOW%I   ^| Скопировать IP-адрес%COLOR_RESET%
+echo:  %COLOR_YELLOW%F   ^| Добавить/убрать избранное%COLOR_RESET%
 echo:
 echo:  %COLOR_YELLOW%9   ^| Вернуться к списку клиентов%COLOR_RESET%
 echo:  %COLOR_YELLOW%0   ^| Выйти%COLOR_RESET%
@@ -114,6 +144,34 @@ if "%action%"=="4" (
 )
 if "%action%"=="5" (
     call :open_mstsc
+    goto after_action
+)
+if "%action%"=="6" (
+    call :run_tracert
+    goto after_action
+)
+if "%action%"=="7" (
+    call :open_computer_management
+    goto after_action
+)
+if "%action%"=="8" (
+    call :open_remote_cmd_winrs
+    goto after_action
+)
+if /i "%action%"=="G" (
+    call :run_gpupdate_winrs
+    goto after_action
+)
+if /i "%action%"=="C" (
+    call :copy_computer
+    goto after_action
+)
+if /i "%action%"=="I" (
+    call :copy_ip
+    goto after_action
+)
+if /i "%action%"=="F" (
+    call :toggle_favorite
     goto after_action
 )
 if "%action%"=="9" goto client_list
@@ -159,6 +217,7 @@ echo:
 echo:                       %COLOR_GREEN%Quick Remote Toolkit%COLOR_RESET%
 echo: _______________________________________________________________________________
 echo:
+if "%SHOW_FAVORITES%"=="1" echo:  Режим: %COLOR_YELLOW%только избранные%COLOR_RESET%
 echo:   №  ^| Имя компьютера    ^| IP-адрес        ^| Имя сотрудника
 echo:  --- ^| ----------------- ^| --------------- ^| ---------------------
 exit /b 0
@@ -170,6 +229,7 @@ echo:
 echo:  Файл клиентов: %COLOR_MILK%%CLIENTS_FILE%%COLOR_RESET%
 echo:
 echo:  %COLOR_YELLOW%R   ^| Открыть последнего выбранного клиента%COLOR_RESET%
+echo:  %COLOR_YELLOW%F   ^| Переключить избранное/все клиенты%COLOR_RESET%
 echo:  %COLOR_YELLOW%E   ^| Редактировать CSV в Блокноте%COLOR_RESET%
 echo:  %COLOR_YELLOW%L   ^| Перечитать CSV%COLOR_RESET%
 echo:  %COLOR_YELLOW%0   ^| Выйти%COLOR_RESET%
@@ -191,6 +251,9 @@ echo:  !row_num:~-3! ^| !row_computer:~0,17! ^| !row_ip:~0,15! ^| !row_person:~0
 exit /b 0
 
 :print_selected
+call :is_favorite "!computer!"
+set "favorite_status=нет"
+if "!IS_FAVORITE!"=="1" set "favorite_status=да"
 echo:
 echo:                       %COLOR_GREEN%Quick Remote Toolkit%COLOR_RESET%
 echo: _______________________________________________________________________________
@@ -198,6 +261,7 @@ echo:
 echo:  Клиент:      %COLOR_MILK%!computer!%COLOR_RESET%
 echo:  IP-адрес:    %COLOR_MILK%!ip!%COLOR_RESET%
 echo:  Сотрудник:   %COLOR_MILK%!person!%COLOR_RESET%
+echo:  Избранное:   %COLOR_MILK%!favorite_status!%COLOR_RESET%
 echo:
 echo: _______________________________________________________________________________
 exit /b 0
@@ -222,10 +286,74 @@ if "!target!"=="-" set "target=!computer!"
 if not defined target set "target=!computer!"
 exit /b 0
 
+:log_action
+set "log_text=%~1"
+>> "%LOG_FILE%" echo [%date% %time%] !log_text! ^| !computer! ^| !target! ^| !person!
+exit /b 0
+
+:is_favorite
+set "favorite_check=%~1"
+set "IS_FAVORITE=0"
+if not exist "%FAVORITES_FILE%" exit /b 0
+for /f "usebackq delims=" %%F in ("%FAVORITES_FILE%") do (
+    if /i "%%~F"=="!favorite_check!" set "IS_FAVORITE=1"
+)
+exit /b 0
+
+:toggle_favorite
+call :is_favorite "!computer!"
+if "!IS_FAVORITE!"=="1" (
+    call :remove_favorite
+    echo:
+    echo %COLOR_MILK%!computer!%COLOR_RESET% убран из избранного.
+    call :log_action "Remove favorite"
+) else (
+    >> "%FAVORITES_FILE%" echo !computer!
+    echo:
+    echo %COLOR_MILK%!computer!%COLOR_RESET% добавлен в избранное.
+    call :log_action "Add favorite"
+)
+exit /b 0
+
+:remove_favorite
+set "tmp_favorites=%TEMP%\QuickRemoteToolkit.favorites.%RANDOM%.tmp"
+if exist "%tmp_favorites%" del "%tmp_favorites%" >nul 2>nul
+if exist "%FAVORITES_FILE%" (
+    for /f "usebackq delims=" %%F in ("%FAVORITES_FILE%") do (
+        if /i not "%%~F"=="!computer!" >> "%tmp_favorites%" echo %%~F
+    )
+)
+if exist "%tmp_favorites%" (
+    move /y "%tmp_favorites%" "%FAVORITES_FILE%" >nul
+) else (
+    if exist "%FAVORITES_FILE%" del "%FAVORITES_FILE%" >nul 2>nul
+)
+exit /b 0
+
+:copy_text
+set "copy_value=%~1"
+<nul set /p "=%copy_value%" | clip
+exit /b 0
+
+:copy_computer
+call :copy_text "!computer!"
+echo:
+echo Скопировано имя ПК: %COLOR_MILK%!computer!%COLOR_RESET%
+call :log_action "Copy computer name"
+exit /b 0
+
+:copy_ip
+call :copy_text "!target!"
+echo:
+echo Скопирован IP/адрес: %COLOR_MILK%!target!%COLOR_RESET%
+call :log_action "Copy IP"
+exit /b 0
+
 :open_remote_assistance
 echo:
 echo %COLOR_MILK%Запускаю Remote Assistance:%COLOR_RESET% !computer!
 start "" msra.exe /offerra "!computer!"
+call :log_action "Open Remote Assistance"
 exit /b 0
 
 :ping_client
@@ -235,8 +363,10 @@ ping -n 1 -w 1000 "!target!" >nul
 
 if errorlevel 1 (
     echo %COLOR_RED%Не отвечает.%COLOR_RESET%
+    call :log_action "Ping failed"
 ) else (
     echo %COLOR_GREEN%Доступен.%COLOR_RESET%
+    call :log_action "Ping ok"
 )
 exit /b 0
 
@@ -244,16 +374,49 @@ exit /b 0
 echo:
 echo %COLOR_MILK%Открываю административную шару:%COLOR_RESET% \\!computer!\c$
 start "" "\\!computer!\c$"
+call :log_action "Open admin share"
 exit /b 0
 
 :open_event_viewer
 echo:
 echo %COLOR_MILK%Открываю Event Viewer:%COLOR_RESET% !computer!
 start "" eventvwr.msc /computer:!computer!
+call :log_action "Open Event Viewer"
 exit /b 0
 
 :open_mstsc
 echo:
 echo %COLOR_MILK%Запускаю mstsc:%COLOR_RESET% !computer!
 start "" mstsc.exe /v:!computer!
+call :log_action "Open mstsc"
+exit /b 0
+
+:run_tracert
+echo:
+echo %COLOR_MILK%Запускаю tracert:%COLOR_RESET% !target!
+start "" cmd.exe /k tracert "!target!"
+call :log_action "Run tracert"
+exit /b 0
+
+:open_computer_management
+echo:
+echo %COLOR_MILK%Открываю Computer Management:%COLOR_RESET% !computer!
+start "" compmgmt.msc /computer:\\!computer!
+call :log_action "Open Computer Management"
+exit /b 0
+
+:open_remote_cmd_winrs
+echo:
+echo %COLOR_MILK%Открываю удаленный cmd через WinRS:%COLOR_RESET% !computer!
+echo Для работы на удаленном ПК должен быть включен WinRM.
+start "" cmd.exe /k winrs -r:!computer! cmd
+call :log_action "Open remote cmd WinRS"
+exit /b 0
+
+:run_gpupdate_winrs
+echo:
+echo %COLOR_MILK%Запускаю gpupdate /force через WinRS:%COLOR_RESET% !computer!
+echo Для работы на удаленном ПК должен быть включен WinRM.
+start "" cmd.exe /k winrs -r:!computer! gpupdate /force
+call :log_action "Run gpupdate WinRS"
 exit /b 0
