@@ -4,6 +4,7 @@ chcp 65001 >nul
 
 set "TOOLKIT_CLIENTS_FILE=%~dp0QuickRemoteToolkit.clients.csv"
 set "REMOTE_ASSISTANT_CLIENTS_FILE=%~dp0RemoteAssistant.clients.csv"
+set "SYNC_SCRIPT=%~dp0Sync-QuickRemoteToolkitClients.ps1"
 set "FAVORITES_FILE=%~dp0QuickRemoteToolkit.favorites.txt"
 set "LOG_FILE=%~dp0QuickRemoteToolkit.actions.log"
 set "CLIENTS_FILE="
@@ -18,16 +19,37 @@ set "COLOR_RESET=[0m"
 
 call :find_clients_file
 if not defined CLIENTS_FILE (
-    echo %COLOR_RED%Не найден файл со списком клиентов.%COLOR_RESET%
-    echo:
-    echo Создайте рядом со скриптом один из файлов:
-    echo   QuickRemoteToolkit.clients.csv
-    echo   RemoteAssistant.clients.csv
-    echo:
-    echo Можно скопировать QuickRemoteToolkit.clients.example.csv и заполнить его своими данными.
-    pause
-    exit /b 1
+    goto missing_clients_menu
 )
+
+:missing_clients_menu
+cls
+echo:
+echo:                       %COLOR_GREEN%Quick Remote Toolkit%COLOR_RESET%
+echo: _______________________________________________________________________________
+echo:
+echo %COLOR_RED%Не найден файл со списком клиентов.%COLOR_RESET%
+echo:
+echo Создайте рядом со скриптом один из файлов:
+echo   QuickRemoteToolkit.clients.csv
+echo   RemoteAssistant.clients.csv
+echo:
+echo Можно скопировать QuickRemoteToolkit.clients.example.csv и заполнить его своими данными.
+echo:
+echo:  %COLOR_YELLOW%S   ^| Собрать список клиентов из Active Directory%COLOR_RESET%
+echo:  %COLOR_YELLOW%0   ^| Выйти%COLOR_RESET%
+echo:
+
+set "missing_choice="
+set /p missing_choice="Введите команду: " || exit /b 1
+if /i "%missing_choice%"=="S" (
+    call :sync_clients_from_ad
+    call :find_clients_file
+    if defined CLIENTS_FILE goto client_list
+    goto missing_clients_menu
+)
+if "%missing_choice%"=="0" exit /b 1
+goto missing_clients_menu
 
 :client_list
 call :find_clients_file
@@ -65,6 +87,11 @@ if /i "%choice%"=="Q" exit /b 0
 
 if /i "%choice%"=="E" (
     start "" notepad.exe "%CLIENTS_FILE%"
+    goto client_list
+)
+
+if /i "%choice%"=="S" (
+    call :sync_clients_from_ad
     goto client_list
 )
 
@@ -229,6 +256,7 @@ echo:
 echo:  Файл клиентов: %COLOR_MILK%%CLIENTS_FILE%%COLOR_RESET%
 echo:
 echo:  %COLOR_YELLOW%R   ^| Открыть последнего выбранного клиента%COLOR_RESET%
+echo:  %COLOR_YELLOW%S   ^| Обновить список из Active Directory%COLOR_RESET%
 echo:  %COLOR_YELLOW%F   ^| Переключить избранное/все клиенты%COLOR_RESET%
 echo:  %COLOR_YELLOW%E   ^| Редактировать CSV в Блокноте%COLOR_RESET%
 echo:  %COLOR_YELLOW%L   ^| Перечитать CSV%COLOR_RESET%
@@ -284,6 +312,28 @@ set "person=!PERSON_%selected%!"
 set "target=!ip!"
 if "!target!"=="-" set "target=!computer!"
 if not defined target set "target=!computer!"
+exit /b 0
+
+:sync_clients_from_ad
+echo:
+if not exist "%SYNC_SCRIPT%" (
+    echo %COLOR_RED%Не найден скрипт синхронизации:%COLOR_RESET%
+    echo "%SYNC_SCRIPT%"
+    pause
+    exit /b 1
+)
+
+echo %COLOR_MILK%Запускаю синхронизацию клиентов из Active Directory...%COLOR_RESET%
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%SYNC_SCRIPT%" -OutputPath "%TOOLKIT_CLIENTS_FILE%"
+if errorlevel 1 (
+    echo:
+    echo %COLOR_RED%Синхронизация завершилась с ошибкой.%COLOR_RESET%
+) else (
+    echo:
+    echo %COLOR_GREEN%Список клиентов обновлен:%COLOR_RESET% "%TOOLKIT_CLIENTS_FILE%"
+)
+echo:
+pause
 exit /b 0
 
 :log_action
