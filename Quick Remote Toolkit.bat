@@ -21,6 +21,7 @@ call :find_clients_file
 if not defined CLIENTS_FILE (
     goto missing_clients_menu
 )
+goto client_list
 
 :missing_clients_menu
 cls
