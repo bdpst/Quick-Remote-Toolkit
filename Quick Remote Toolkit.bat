@@ -394,7 +394,7 @@ exit /b 0
 :run_tracert
 echo:
 echo %COLOR_MILK%Запускаю tracert:%COLOR_RESET% !target!
-start "" cmd.exe /k tracert "!target!"
+start "Tracert !computer!" "%ComSpec%" /d /c "tracert !target! & echo. & pause"
 call :log_action "Run tracert"
 exit /b 0
 
@@ -409,7 +409,7 @@ exit /b 0
 echo:
 echo %COLOR_MILK%Открываю удаленный cmd через WinRS:%COLOR_RESET% !computer!
 echo Для работы на удаленном ПК должен быть включен WinRM.
-start "" cmd.exe /k winrs -r:!computer! cmd
+start "WinRS !computer!" "%ComSpec%" /d /k "winrs -r:!computer! cmd"
 call :log_action "Open remote cmd WinRS"
 exit /b 0
 
@@ -417,6 +417,6 @@ exit /b 0
 echo:
 echo %COLOR_MILK%Запускаю gpupdate /force через WinRS:%COLOR_RESET% !computer!
 echo Для работы на удаленном ПК должен быть включен WinRM.
-start "" cmd.exe /k winrs -r:!computer! gpupdate /force
+start "gpupdate !computer!" "%ComSpec%" /d /c "winrs -r:!computer! gpupdate /force & echo. & pause"
 call :log_action "Run gpupdate WinRS"
 exit /b 0
