@@ -120,6 +120,7 @@ try {
     foreach ($property in @(
         'name',
         'dnshostname',
+        'description',
         'lastlogontimestamp'
     )) {
         [void]$searcher.PropertiesToLoad.Add($property)
@@ -143,11 +144,13 @@ try {
         }
 
         $dnsName = Get-DirectoryValue -Result $result -Name 'dnshostname'
+        $description = Get-DirectoryValue -Result $result -Name 'description'
         $ip = Resolve-ClientIPv4 -DnsName $dnsName -ComputerName $name
 
         [pscustomobject]@{
             Computer = $name
             IP = $ip
+            Person = $description
         }
     }
 
@@ -157,14 +160,15 @@ try {
     }
 
     $lines = [System.Collections.Generic.List[string]]::new()
-    [void]$lines.Add('number;computer;ip')
+    [void]$lines.Add('number;computer;ip;person')
 
     $number = 1
     foreach ($row in $rows) {
-        [void]$lines.Add(('{0};{1};{2}' -f
+        [void]$lines.Add(('{0};{1};{2};{3}' -f
             $number,
             (Escape-CsvField $row.Computer),
-            (Escape-CsvField $row.IP)
+            (Escape-CsvField $row.IP),
+            (Escape-CsvField $row.Person)
         ))
         $number++
     }

@@ -21,7 +21,6 @@ call :find_clients_file
 if not defined CLIENTS_FILE (
     goto missing_clients_menu
 )
-goto client_list
 
 :missing_clients_menu
 cls
@@ -59,7 +58,7 @@ cls
 call :print_header
 
 set "shown=0"
-for /f "usebackq skip=1 tokens=1-5 delims=;" %%A in ("%CLIENTS_FILE%") do (
+for /f "usebackq skip=1 tokens=1-4 delims=;" %%A in ("%CLIENTS_FILE%") do (
     if not "%%~A"=="" (
         set "can_show=1"
         if "%SHOW_FAVORITES%"=="1" (
@@ -67,7 +66,7 @@ for /f "usebackq skip=1 tokens=1-5 delims=;" %%A in ("%CLIENTS_FILE%") do (
             if "!IS_FAVORITE!"=="0" set "can_show=0"
         )
         if "!can_show!"=="1" (
-            call :print_row "%%A" "%%B" "%%C"
+            call :print_row "%%A" "%%B" "%%C" "%%D"
             set /a shown+=1
         )
     )
@@ -246,8 +245,8 @@ echo:                       %COLOR_GREEN%Quick Remote Toolkit%COLOR_RESET%
 echo: _______________________________________________________________________________
 echo:
 if "%SHOW_FAVORITES%"=="1" echo:  Режим: %COLOR_YELLOW%только избранные%COLOR_RESET%
-echo:   №  ^| Имя компьютера    ^| IP-адрес
-echo:  --- ^| ----------------- ^| ---------------
+echo:   №  ^| Имя компьютера    ^| IP-адрес        ^| Имя сотрудника
+echo:  --- ^| ----------------- ^| --------------- ^| ---------------------
 exit /b 0
 
 :print_client_footer
@@ -269,12 +268,14 @@ exit /b 0
 set "row_num=%~1"
 set "row_computer=%~2"
 set "row_ip=%~3"
+set "row_person=%~4"
 
 set "row_num=   %row_num%"
 set "row_computer=%row_computer%                 "
 set "row_ip=%row_ip%               "
+set "row_person=%row_person%                     "
 
-echo:  !row_num:~-3! ^| !row_computer:~0,17! ^| !row_ip:~0,15!
+echo:  !row_num:~-3! ^| !row_computer:~0,17! ^| !row_ip:~0,15! ^| !row_person:~0,21!
 exit /b 0
 
 :print_selected
@@ -287,13 +288,14 @@ echo: __________________________________________________________________________
 echo:
 echo:  Клиент:      %COLOR_MILK%!computer!%COLOR_RESET%
 echo:  IP-адрес:    %COLOR_MILK%!ip!%COLOR_RESET%
+echo:  Сотрудник:   %COLOR_MILK%!person!%COLOR_RESET%
 echo:  Избранное:   %COLOR_MILK%!favorite_status!%COLOR_RESET%
 echo:
 echo: _______________________________________________________________________________
 exit /b 0
 
 :load_clients
-for /f "usebackq skip=1 tokens=1-5 delims=;" %%A in ("%CLIENTS_FILE%") do (
+for /f "usebackq skip=1 tokens=1-4 delims=;" %%A in ("%CLIENTS_FILE%") do (
     if not "%%~A"=="" (
         set "CLIENT_%%A=%%B"
         set "IP_%%A=%%C"

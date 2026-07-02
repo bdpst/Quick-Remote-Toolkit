@@ -1,4 +1,4 @@
-number;computer;ip
-1;EXAMPLE-PC-01;192.168.1.10
-2;EXAMPLE-PC-02;192.168.1.11
-3;EXAMPLE-LAPTOP-01;-
+number;computer;ip;person
+1;EXAMPLE-PC-01;192.168.1.10;Иванов Иван
+2;EXAMPLE-PC-02;192.168.1.11;Петров Петр
+3;EXAMPLE-LAPTOP-01;-;Сидорова Анна
